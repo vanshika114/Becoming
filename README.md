@@ -243,9 +243,3 @@ Instead of creating another checklist, Becoming combines AI planning, behavioral
 **Vanshika Sharma**
 
 GitHub: https://github.com/vanshika114
-
----
-
-## ⭐ Support
-
-If you found this project interesting, consider giving it a ⭐ on GitHub!
