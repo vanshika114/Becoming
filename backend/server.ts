@@ -15,79 +15,71 @@ const ai = new GoogleGenAI({
 });
 
 const systemPrompt = `
-You are Becoming AI, an intelligent execution companion that helps people turn goals into completed outcomes.
+You are Becoming AI.
 
-Your mission is not simply to remind users about deadlines, but to proactively help them plan, prioritize, and successfully complete any goal before time runs out.
+You MUST return ONLY valid JSON.
 
-The user may ask about anything, including but not limited to:
-- academic assignments
-- exams
-- hackathons
-- interviews
-- meetings
-- side projects
-- startup work
-- fitness goals
-- habits
-- bill payments
-- personal errands
-- travel planning
-- creative projects
-- household tasks
-- professional work
+The JSON MUST exactly match this structure.
 
-Never assume the user is working on a hackathon unless they explicitly mention one.
+{
+  "ai_overview": "string",
+  "risk_score": 0,
+  "risk_reason": "string",
+  "completion_probability": 0,
+  "ai_confidence": 0,
+  "estimated_total_time": "string",
+  "energy_level": "low | steady | high | peak",
+  "focus_mode": "deep-work | light-tasks | recovery | sprint",
+  "next_best_action": "string",
+  "productivity_tip": "string",
+  "motivation": "string",
+  "subtasks": [
+    {
+      "id": "1",
+      "title": "string",
+      "description": "string",
+      "estimated_minutes": 30,
+      "priority": "low | medium | high | critical",
+      "schedule": "string",
+      "reason": "string",
+      "completed": false
+    }
+  ]
+}
 
-For every request:
+Rules:
 
-1. Understand the user's goal, deadline, available time, and workload.
-2. Break the goal into realistic, actionable subtasks.
-3. Ensure the first subtask can be started within the next 10 minutes.
-4. Estimate the duration of every subtask.
-5. Assign a priority using ONLY:
-- low
-- medium
-- high
-- critical
+- Return ONLY JSON.
+- No markdown.
+- No explanations.
+- No code fences.
+- risk_score must be a number.
+- completion_probability must be a number.
+- ai_confidence must be a number.
+- estimated_total_time must never be empty.
+- energy_level must be one of:
+  low
+  steady
+  high
+  peak
 
-6. Suggest when each task should ideally be completed.
+- focus_mode must be one of:
+  deep-work
+  light-tasks
+  recovery
+  sprint
 
-7. Explain why every task matters.
+- Every subtask MUST include:
+  id
+  title
+  description
+  estimated_minutes
+  priority
+  schedule
+  reason
+  completed
 
-8. Estimate:
-- deadline risk score (0-100)
-- completion probability (0-100)
-- AI confidence (0-100)
-
-9. Recommend the user's ideal energy level using ONLY:
-- low
-- steady
-- high
-- peak
-
-10. Recommend the most suitable focus mode using ONLY:
-- deep-work
-- light-tasks
-- recovery
-- sprint
-
-11. Identify the single next best action.
-
-12. Give one personalized productivity tip.
-
-13. End with a short encouraging motivation.
-
-Your recommendations should adapt to the user's specific situation rather than following a fixed template.
-
-Return ONLY valid JSON matching the provided schema.
-
-Do not output markdown.
-
-Do not output explanations.
-
-Do not wrap JSON inside \`\`\`.
-
-Do not output anything except JSON.
+Never omit any field.
 `;
 
 app.post("/generate-plan", async (req, res) => {
@@ -105,37 +97,63 @@ app.post("/generate-plan", async (req, res) => {
 
     const text = response.text ?? "";
 
-    console.log("\n========== GEMINI RESPONSE ==========");
+    console.log("\n========== RAW GEMINI ==========");
     console.log(text);
-    console.log("=====================================\n");
+    console.log("================================\n");
+
+    let plan;
 
     try {
-        const cleaned = text
-            .replace(/```json/g, "")
-            .replace(/```/g, "")
-            .trim();
-
-        const parsed = JSON.parse(cleaned);
-        console.log("====== GEMINI RESPONSE ======");
-        console.dir(parsed, { depth: null });
-
-
-        res.json(parsed);
+      plan = JSON.parse(text);
     } catch {
-        res.status(500).json({
-            error: "Gemini returned invalid JSON.",
-            raw: text,
-        });
+      return res.status(500).json({
+        error: "Gemini returned invalid JSON",
+        raw: text,
+      });
     }
-  } catch (err: any) {
-        console.error(err);
 
-        res.status(500).json({
-            error: err?.message ?? "Failed to generate plan",
-        });
+    // Fill missing fields so the frontend never crashes
+    plan.ai_overview ??= "";
+    plan.risk_score ??= 0;
+    plan.risk_reason ??= "";
+    plan.completion_probability ??= 0;
+    plan.ai_confidence ??= 0;
+    plan.estimated_total_time ??= "";
+    plan.energy_level ??= "steady";
+    plan.focus_mode ??= "deep-work";
+    plan.next_best_action ??= "";
+    plan.productivity_tip ??= "";
+    plan.motivation ??= "";
+
+    if (!Array.isArray(plan.subtasks)) {
+      plan.subtasks = [];
     }
+
+    plan.subtasks = plan.subtasks.map((task: any, index: number) => ({
+      id: task.id ?? String(index + 1),
+      title: task.title ?? "",
+      description: task.description ?? "",
+      estimated_minutes: task.estimated_minutes ?? 30,
+      priority: task.priority ?? "medium",
+      schedule: task.schedule ?? "",
+      reason: task.reason ?? "",
+      completed: task.completed ?? false,
+    }));
+
+    console.log("\n========== FINAL JSON ==========");
+    console.dir(plan, { depth: null });
+    console.log("================================\n");
+
+    res.json(plan);
+  } catch (err: any) {
+    console.error(err);
+
+    res.status(500).json({
+      error: err.message || "Failed to generate plan",
+    });
+  }
 });
 
 app.listen(3001, () => {
-  console.log("Server running");
+  console.log("Server running on http://localhost:3001");
 });

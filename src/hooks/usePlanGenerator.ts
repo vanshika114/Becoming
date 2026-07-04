@@ -45,7 +45,10 @@ export function usePlanGenerator(): UsePlanGeneratorResult {
         throw new Error(data.error || "Backend Error");
       }
 
+      console.log("DATA RECEIVED:", data);
       setPlan(data);
+      // Save the latest AI plan for other pages (Timeline, Dashboard, etc.)
+      localStorage.setItem("becoming-plan", JSON.stringify(data));
       console.log("Plan loaded successfully!");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong generating your plan.");
